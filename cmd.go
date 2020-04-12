@@ -7,7 +7,7 @@ import (
 	"os/exec"
 )
 
-func (r Repo) runCmd(name string, args ...string) (stdOut string, err error) {
+func (r gitRepo) runCmd(name string, args ...string) (stdOut string, err error) {
 	cmd := exec.Command(name, args...)
 	buffOut := new(bytes.Buffer)
 	buffErr := new(bytes.Buffer)

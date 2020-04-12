@@ -15,15 +15,7 @@ type sshKey struct {
 	content  []byte
 }
 
-// pgpKey is a type for a pgp key
-type pgpKey struct {
-	name    string
-	public  string
-	private string
-	id      string
-}
-
-func (r Repo) setupSSHKey() ([]string, error) {
+func (r gitRepo) setupSSHKey() ([]string, error) {
 	if r.sshKey == nil {
 		return nil, fmt.Errorf("no ssh keys to setup")
 	}
@@ -49,8 +41,4 @@ func (r Repo) setupSSHKey() ([]string, error) {
 	}
 
 	return []string{"GIT_SSH=" + wrapperPath, "PKEY=" + r.sshKey.filename}, nil
-}
-
-func (r Repo) installGPGKey() error {
-	return nil
 }

@@ -24,9 +24,9 @@ var urlRegExp = regexp.MustCompile(`https:\/\/[-a-zA-Z0-9@:%._\+#?&//=]*`)
 
 // Clone a git repository from the specified url to the destination path. Use Options to force the use of SSH Key and or PGP Key on this repo
 func Clone(path, url string, opts ...Option) (Repo, error) {
-	r := Repo{path: path, url: url}
+	r := &gitRepo{path: path, url: url}
 	for _, f := range opts {
-		if err := f(&r); err != nil {
+		if err := f(r); err != nil {
 			return r, err
 		}
 	}
@@ -41,15 +41,16 @@ func Clone(path, url string, opts ...Option) (Repo, error) {
 }
 
 // New instanciance a repo instance from the path assuming the repo has already been cloned in.
-func New(path string, opts ...Option) (r Repo, err error) {
-	r = Repo{path: path}
+func New(path string, opts ...Option) (Repo, error) {
+	r := &gitRepo{path: path}
+	var err error
 	r.path, err = findDotGitDirectory(path)
 	if err != nil {
 		return r, err
 	}
 
 	for _, f := range opts {
-		if err := f(&r); err != nil {
+		if err := f(r); err != nil {
 			return r, err
 		}
 	}
@@ -85,7 +86,7 @@ func findDotGitDirectory(p string) (string, error) {
 }
 
 // FetchURL returns the git URL the the remote origin
-func (r Repo) FetchURL() (string, error) {
+func (r gitRepo) FetchURL() (string, error) {
 	stdOut, err := r.runCmd("git", "remote", "show", "origin", "-n")
 	if err != nil {
 		return "", err
@@ -112,7 +113,7 @@ func (r Repo) FetchURL() (string, error) {
 }
 
 // Name returns the name of the repo, deduced from the remote origin URL
-func (r Repo) Name() (string, error) {
+func (r gitRepo) Name() (string, error) {
 	fetchURL, err := r.FetchURL()
 	if err != nil {
 		return "", err
@@ -122,7 +123,7 @@ func (r Repo) Name() (string, error) {
 }
 
 // LocalConfigGet returns data from the local git config
-func (r Repo) LocalConfigGet(section, key string) (string, error) {
+func (r gitRepo) LocalConfigGet(section, key string) (string, error) {
 	s, err := r.runCmd("git", "config", "--local", "--get", fmt.Sprintf("%s.%s", section, key))
 	if err != nil {
 		return "", err
@@ -131,7 +132,7 @@ func (r Repo) LocalConfigGet(section, key string) (string, error) {
 }
 
 // LocalConfigSet set data in the local git config
-func (r Repo) LocalConfigSet(section, key, value string) error {
+func (r gitRepo) LocalConfigSet(section, key, value string) error {
 	conf, _ := r.LocalConfigGet(section, key)
 	s := fmt.Sprintf("%s.%s", section, key)
 	if conf != "" {
@@ -187,7 +188,7 @@ func trimURL(fetchURL string) (string, error) {
 }
 
 // Commits returns all the commit between
-func (r Repo) Commits(from, to string) ([]Commit, error) {
+func (r gitRepo) Commits(from, to string) ([]Commit, error) {
 	if from == "0000000000000000000000000000000000000000" {
 		from = ""
 	}
@@ -221,7 +222,7 @@ func (r Repo) Commits(from, to string) ([]Commit, error) {
 	return commits, err
 }
 
-func (r Repo) parseDiff(hash, diff string) (map[string]File, error) {
+func (r gitRepo) parseDiff(hash, diff string) (map[string]File, error) {
 	Files := make(map[string]File)
 
 	// Read line per line the last item
@@ -290,7 +291,7 @@ func (r Repo) parseDiff(hash, diff string) (map[string]File, error) {
 }
 
 // GetCommit returns a commit
-func (r Repo) GetCommit(hash string) (Commit, error) {
+func (r gitRepo) GetCommit(hash string) (Commit, error) {
 	hash = strings.TrimFunc(hash, func(r rune) bool {
 		return r == '\n' || r == ' ' || r == '\t'
 	})
@@ -317,7 +318,7 @@ func (r Repo) GetCommit(hash string) (Commit, error) {
 }
 
 // GetCommitWithDiff return the commit data with the parsed diff
-func (r Repo) GetCommitWithDiff(hash string) (Commit, error) {
+func (r gitRepo) GetCommitWithDiff(hash string) (Commit, error) {
 	hash = strings.TrimFunc(hash, func(r rune) bool {
 		return r == '\n' || r == ' ' || r == '\t'
 	})
@@ -346,7 +347,7 @@ func (r Repo) GetCommitWithDiff(hash string) (Commit, error) {
 	return c, err
 }
 
-func (r Repo) Diff(hash string, filename string) (string, error) {
+func (r gitRepo) Diff(hash string, filename string) (string, error) {
 	if hash == "" {
 		return r.runCmd("git", "diff", "--pretty=", "--", filename)
 	}
@@ -354,7 +355,7 @@ func (r Repo) Diff(hash string, filename string) (string, error) {
 }
 
 // ExistsDiff returns true if there are no commited diff in the repo.
-func (r Repo) ExistsDiff() bool {
+func (r gitRepo) ExistsDiff() bool {
 	if _, err := r.runCmd("git", "diff", "--quiet", "HEAD", "--"); err != nil {
 		return true
 	}
@@ -362,7 +363,7 @@ func (r Repo) ExistsDiff() bool {
 }
 
 // LatestCommit returns the latest commit of the current branch
-func (r Repo) LatestCommit() (Commit, error) {
+func (r gitRepo) LatestCommit() (Commit, error) {
 	c := Commit{}
 	hash, err := r.runCmd("git", "rev-parse", "HEAD")
 	if err != nil {
@@ -372,7 +373,7 @@ func (r Repo) LatestCommit() (Commit, error) {
 }
 
 // CurrentBranch returns the current branch
-func (r Repo) CurrentBranch() (string, error) {
+func (r gitRepo) CurrentBranch() (string, error) {
 	b, err := r.runCmd("git", "rev-parse", "--abbrev-ref", "HEAD")
 	if err != nil {
 		return "", err
@@ -381,7 +382,7 @@ func (r Repo) CurrentBranch() (string, error) {
 }
 
 // VerifyTag returns the sha1 of the tag if exists, if it doesn't exist, it returns an error
-func (r Repo) VerifyTag(tag string) (string, error) {
+func (r gitRepo) VerifyTag(tag string) (string, error) {
 	sha1, err := r.runCmd("git", "rev-parse", "--verify", tag)
 	if err != nil {
 		return "", fmt.Errorf("tag not found: %v", err)
@@ -390,7 +391,7 @@ func (r Repo) VerifyTag(tag string) (string, error) {
 }
 
 // FetchRemoteTag runs a git fetch then checkout the remote tag
-func (r Repo) FetchRemoteTag(remote, tag string) error {
+func (r gitRepo) FetchRemoteTag(remote, tag string) error {
 	// delete tag if exist
 	if _, err := r.runCmd("git", "rev-parse", "--verify", tag); err == nil {
 		if _, err := r.runCmd("git", "tag", "-d", tag); err != nil {
@@ -411,7 +412,7 @@ func (r Repo) FetchRemoteTag(remote, tag string) error {
 }
 
 // LocalBranchExists returns if given branch exists locally and has upstream.
-func (r Repo) LocalBranchExists(branch string) (exists, hasUpstream bool) {
+func (r gitRepo) LocalBranchExists(branch string) (exists, hasUpstream bool) {
 	if _, err := r.runCmd("git", "rev-parse", "--verify", branch); err == nil {
 		exists = true
 	}
@@ -422,7 +423,7 @@ func (r Repo) LocalBranchExists(branch string) (exists, hasUpstream bool) {
 }
 
 // FetchRemoteBranch runs a git fetch then checkout the remote branch
-func (r Repo) FetchRemoteBranch(remote, branch string) error {
+func (r gitRepo) FetchRemoteBranch(remote, branch string) error {
 	if _, err := r.runCmd("git", "fetch", remote); err != nil {
 		return fmt.Errorf("unable to git fetch: %s", err)
 	}
@@ -450,7 +451,7 @@ func (r Repo) FetchRemoteBranch(remote, branch string) error {
 }
 
 // Checkout checkouts a branch on the local repository
-func (r Repo) Checkout(branch string) error {
+func (r gitRepo) Checkout(branch string) error {
 	_, err := r.runCmd("git", "checkout", branch)
 	if err != nil {
 		return fmt.Errorf("unable to git checkout: %s", err)
@@ -459,7 +460,7 @@ func (r Repo) Checkout(branch string) error {
 }
 
 // CheckoutNewBranch checkouts a new branch on the local repository
-func (r Repo) CheckoutNewBranch(branch string) error {
+func (r gitRepo) CheckoutNewBranch(branch string) error {
 	_, err := r.runCmd("git", "checkout", "-b", branch)
 	if err != nil {
 		return fmt.Errorf("unable to git checkout: %s", err)
@@ -468,7 +469,7 @@ func (r Repo) CheckoutNewBranch(branch string) error {
 }
 
 // DeleteBranch deletes a branch on the local repository
-func (r Repo) DeleteBranch(branch string) error {
+func (r gitRepo) DeleteBranch(branch string) error {
 	_, err := r.runCmd("git", "branch", "-d", branch)
 	if err != nil {
 		return fmt.Errorf("unable to delete branch: %s", err)
@@ -477,19 +478,19 @@ func (r Repo) DeleteBranch(branch string) error {
 }
 
 // Pull pulls a branch from a remote
-func (r Repo) Pull(remote, branch string) error {
+func (r gitRepo) Pull(remote, branch string) error {
 	_, err := r.runCmd("git", "pull", remote, branch)
 	return err
 }
 
 // ResetHard hard resets a ref
-func (r Repo) ResetHard(hash string) error {
+func (r gitRepo) ResetHard(hash string) error {
 	_, err := r.runCmd("git", "reset", "--hard", hash)
 	return err
 }
 
 // DefaultBranch returns the default branch of the remote origin
-func (r Repo) DefaultBranch() (string, error) {
+func (r gitRepo) DefaultBranch() (string, error) {
 	details, err := r.runCmd("git", "remote", "show", "origin")
 	if err != nil {
 		return "", err
@@ -506,7 +507,7 @@ func (r Repo) DefaultBranch() (string, error) {
 }
 
 // Glob returns the matching files in the repo
-func (r Repo) Glob(s string) ([]string, error) {
+func (r gitRepo) Glob(s string) ([]string, error) {
 	p := filepath.Join(r.path, s)
 	files, err := zglob.Glob(p)
 	if err != nil {
@@ -522,13 +523,13 @@ func (r Repo) Glob(s string) ([]string, error) {
 }
 
 // Open opens a file from the repo
-func (r Repo) Open(s string) (*os.File, error) {
+func (r gitRepo) Open(s string) (*os.File, error) {
 	p := filepath.Join(r.path, s)
 	return os.Open(p)
 }
 
 // Write writes a file in the repo
-func (r Repo) Write(s string, content io.Reader) error {
+func (r gitRepo) Write(s string, content io.Reader) error {
 	p := filepath.Join(r.path, s)
 	f, err := os.OpenFile(p, os.O_CREATE|os.O_WRONLY, os.FileMode(0644))
 	if err != nil {
@@ -541,7 +542,7 @@ func (r Repo) Write(s string, content io.Reader) error {
 }
 
 // Add file contents to the index
-func (r Repo) Add(s ...string) error {
+func (r gitRepo) Add(s ...string) error {
 	args := append([]string{"add"}, s...)
 	out, err := r.runCmd("git", args...)
 	if err != nil {
@@ -551,7 +552,7 @@ func (r Repo) Add(s ...string) error {
 }
 
 // Remove file or directory
-func (r Repo) Remove(s ...string) error {
+func (r gitRepo) Remove(s ...string) error {
 	args := append([]string{"rm", "-f", "-r"}, s...)
 	out, err := r.runCmd("git", args...)
 	if err != nil {
@@ -561,7 +562,7 @@ func (r Repo) Remove(s ...string) error {
 }
 
 // Commit the index
-func (r Repo) Commit(m string, opts ...Option) error {
+func (r gitRepo) Commit(m string, opts ...Option) error {
 	for _, f := range opts {
 		if err := f(&r); err != nil {
 			return err
@@ -575,7 +576,7 @@ func (r Repo) Commit(m string, opts ...Option) error {
 }
 
 // Push (always with force) the branch
-func (r Repo) Push(remote, branch string, opts ...Option) error {
+func (r gitRepo) Push(remote, branch string, opts ...Option) error {
 	for _, f := range opts {
 		if err := f(&r); err != nil {
 			return err
@@ -596,7 +597,7 @@ func (r Repo) Push(remote, branch string, opts ...Option) error {
 }
 
 // RemoteAdd run git remote add
-func (r Repo) RemoteAdd(remote, branch, url string) error {
+func (r gitRepo) RemoteAdd(remote, branch, url string) error {
 	var args []string
 	if branch != "" {
 		args = []string{"remote", "add", "-t", branch, remote, url}
@@ -611,7 +612,7 @@ func (r Repo) RemoteAdd(remote, branch, url string) error {
 }
 
 // RemoteShow run git remote show
-func (r Repo) RemoteShow(remote string) (string, error) {
+func (r gitRepo) RemoteShow(remote string) (string, error) {
 	args := []string{"remote", "show", remote}
 	out, err := r.runCmd("git", args...)
 	if err != nil {
@@ -621,7 +622,7 @@ func (r Repo) RemoteShow(remote string) (string, error) {
 }
 
 // Status run the git status command
-func (r Repo) Status() (string, error) {
+func (r gitRepo) Status() (string, error) {
 	args := []string{"status", "-s", "-uall"}
 	out, err := r.runCmd("git", args...)
 	if err != nil {
@@ -630,7 +631,7 @@ func (r Repo) Status() (string, error) {
 	return out, nil
 }
 
-func (r Repo) CurrentSnapshot() (map[string]File, error) {
+func (r gitRepo) CurrentSnapshot() (map[string]File, error) {
 	diffFileList, err := r.Status()
 	if err != nil {
 		return nil, err
@@ -638,7 +639,7 @@ func (r Repo) CurrentSnapshot() (map[string]File, error) {
 	return r.parseDiff("", diffFileList)
 }
 
-func (r Repo) HasDiverged() (bool, error) {
+func (r gitRepo) HasDiverged() (bool, error) {
 	out, err := r.runCmd("git", "status")
 	if err != nil {
 		return false, fmt.Errorf("command 'git status' failed: %v (%s)", err, out)
@@ -649,7 +650,7 @@ func (r Repo) HasDiverged() (bool, error) {
 	return false, nil
 }
 
-func (r Repo) HookList() ([]string, error) {
+func (r gitRepo) HookList() ([]string, error) {
 	hooksPath := filepath.Join(r.path, ".git", "hooks")
 	var files []string
 	err := filepath.Walk(hooksPath, func(path string, info os.FileInfo, err error) error {
@@ -661,27 +662,27 @@ func (r Repo) HookList() ([]string, error) {
 	return files, err
 }
 
-func (r Repo) DeleteHook(name string) error {
+func (r gitRepo) DeleteHook(name string) error {
 	hookPath := filepath.Join(r.path, ".git", "hooks", name)
 	return os.Remove(hookPath)
 }
 
-func (r Repo) WriteHook(name string, content []byte) error {
+func (r gitRepo) WriteHook(name string, content []byte) error {
 	hookPath := filepath.Join(r.path, ".git", "hooks", name)
 	return ioutil.WriteFile(hookPath, content, os.FileMode(0755))
 }
 
 // Option is a function option
-type Option func(r *Repo) error
+type Option func(r Repo) error
 
 // WithUser configure the git command to use user
 func WithUser(email, name string) Option {
-	return func(r *Repo) error {
-		out, err := r.runCmd("git", "config", "user.email", email)
+	return func(r Repo) error {
+		out, err := r.(*gitRepo).runCmd("git", "config", "user.email", email)
 		if err != nil {
 			return fmt.Errorf("command 'git config user.email' failed: %v (%s)", err, out)
 		}
-		out, err = r.runCmd("git", "config", "user.name", name)
+		out, err = r.(*gitRepo).runCmd("git", "config", "user.name", name)
 		if err != nil {
 			return fmt.Errorf("command 'git config user.name' failed: %v (%s)", err, out)
 		}
@@ -691,11 +692,7 @@ func WithUser(email, name string) Option {
 
 // WithSSHAuth configure the git command to use a specific private key
 func WithSSHAuth(privateKey []byte) Option {
-	return func(r *Repo) error {
-		r.sshKey = &sshKey{
-			content: privateKey,
-		}
-
+	return func(r Repo) error {
 		h := md5.New()
 		if _, err := io.WriteString(h, string(privateKey)); err != nil {
 			return err
@@ -711,41 +708,45 @@ func WithSSHAuth(privateKey []byte) Option {
 		if err := os.MkdirAll(dir, os.FileMode(0700)); err != nil {
 			return err
 		}
-		r.sshKey.filename = filepath.Join(dir, "id_rsa")
-		return ioutil.WriteFile(r.sshKey.filename, r.sshKey.content, os.FileMode(0600))
+		k := &sshKey{
+			content:  privateKey,
+			filename: filepath.Join(dir, "id_rsa"),
+		}
+		r.(*gitRepo).setSSHKey(k)
+		return ioutil.WriteFile(k.filename, k.content, os.FileMode(0600))
 	}
 }
 
 // WithHTTPAuth override the repo configuration to use http auth
 func WithHTTPAuth(username string, password string) Option {
-	return func(r *Repo) error {
-		u, err := url.Parse(r.url)
+	return func(r Repo) error {
+		u, err := url.Parse(r.(*gitRepo).url)
 		if err != nil {
 			return err
 		}
 		u.User = url.UserPassword(username, password)
-		r.url = u.String()
+		r.(*gitRepo).setUrl(u.String())
 		return nil
 	}
 }
 
 // InstallPGPKey install a pgp key in the repo configuration
 func InstallPGPKey(privateKey []byte) Option {
-	return func(r *Repo) error {
+	return func(r Repo) error {
 		return nil
 	}
 }
 
 // WithVerbose add some logs
 func WithVerbose(logger func(format string, i ...interface{})) Option {
-	return func(r *Repo) error {
-		r.verbose = true
-		r.logger = logger
+	return func(r Repo) error {
+		r.(*gitRepo).setVerbose(true)
+		r.(*gitRepo).setLogger(logger)
 		return nil
 	}
 }
 
-func (r Repo) log(format string, i ...interface{}) {
+func (r *gitRepo) log(format string, i ...interface{}) {
 	if r.logger != nil {
 		r.logger(format, i...)
 	}

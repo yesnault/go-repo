@@ -13,7 +13,7 @@ import (
 
 // CloneBare a git bare repository from the specified url to the destination path. Use Options to force the use of SSH Key and or PGP Key on this repo
 func CloneBare(path, url string, opts ...Option) (Repo, error) {
-	r := Repo{path: path, url: url}
+	r := gitRepo{path: path, url: url}
 	for _, f := range opts {
 		if err := f(&r); err != nil {
 			return r, err
@@ -31,19 +31,20 @@ func CloneBare(path, url string, opts ...Option) (Repo, error) {
 
 // NewBare instanciance a bare repo instance from the path assuming the repo has already been cloned in.
 func NewBare(path string, opts ...Option) (b BareRepo, err error) {
-	b = BareRepo{Repo{path: path}}
-	b.repo.path, err = findRefsDirectory(path)
+	b = BareRepo{&gitRepo{path: path}}
+	p, err := findRefsDirectory(path)
+	b.repo.(*gitRepo).setPath(p)
 	if err != nil {
 		return b, err
 	}
 
-	output, _ := b.repo.runCmd("git", "rev-parse", "--is-bare-repository")
+	output, _ := b.repo.(*gitRepo).runCmd("git", "rev-parse", "--is-bare-repository")
 	if !strings.Contains(output, "true") {
 		return b, errors.New("path is not a bare repository")
 	}
 
 	for _, f := range opts {
-		if err := f(&b.repo); err != nil {
+		if err := f(b.repo); err != nil {
 			return b, err
 		}
 	}
@@ -79,7 +80,7 @@ func checkRefsDirectory(path string) bool {
 }
 
 func (b BareRepo) ListFiles() ([]string, error) {
-	output, err := b.repo.runCmd("git", "ls-tree", "--full-tree", "--name-only", "-r", "HEAD")
+	output, err := b.repo.(*gitRepo).runCmd("git", "ls-tree", "--full-tree", "--name-only", "-r", "HEAD")
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +93,7 @@ var singleSpacePattern = regexp.MustCompile(`\s+`)
 
 func (b BareRepo) FileSize(filename string) (int64, error) {
 
-	output, err := b.repo.runCmd("git", "ls-tree", "--full-tree", "--long", "-r", "HEAD")
+	output, err := b.repo.(*gitRepo).runCmd("git", "ls-tree", "--full-tree", "--long", "-r", "HEAD")
 	if err != nil {
 		return -1, err
 	}
@@ -113,7 +114,7 @@ func (b BareRepo) FileSize(filename string) (int64, error) {
 }
 
 func (b BareRepo) ReadFile(filename string) (io.Reader, error) {
-	output, err := b.repo.runCmd("git", "show", "HEAD:"+filename)
+	output, err := b.repo.(*gitRepo).runCmd("git", "show", "HEAD:"+filename)
 	if err != nil {
 		return nil, err
 	}

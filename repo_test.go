@@ -17,7 +17,7 @@ func TestNew(t *testing.T) {
 	require.NoError(t, os.MkdirAll(path, os.FileMode(0755)))
 	r, err := New("testdata")
 	require.NoError(t, err)
-	t.Log(r.path)
+	t.Log(r.(*gitRepo).path)
 }
 
 func TestClone(t *testing.T) {
@@ -73,7 +73,7 @@ func TestCloneFromSSHShouldFailed(t *testing.T) {
 
 	require.NoError(t, os.MkdirAll(path, os.FileMode(0755)))
 
-	_, err := Clone(path, "git@github.com:fsamin/go-repo.git", WithSSHAuth(testRSAKey), WithVerbose(t.Logf))
+	_, err := Clone(path, "git@github.com:fsamin/go-repo.git", WithVerbose(t.Logf), WithSSHAuth(testRSAKey))
 	assert.Error(t, err)
 }
 

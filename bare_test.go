@@ -20,7 +20,7 @@ func TestBare(t *testing.T) {
 	require.NoError(t, err)
 
 	repo, err := NewBare(path, WithVerbose(t.Logf))
-	repo.repo.logger = t.Logf
+	repo.repo.(*gitRepo).setLogger(t.Logf)
 	require.NoError(t, err)
 
 	files, err := repo.ListFiles()
